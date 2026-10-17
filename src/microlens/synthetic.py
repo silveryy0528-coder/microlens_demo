@@ -163,22 +163,3 @@ def generate_synthetic_image(
         data_unit="nm",
     )
     return image, ground_truth
-
-
-if __name__ == "__main__":
-    import matplotlib.pyplot as plt
-    image, ground_truth = generate_synthetic_image(
-        offset_nm=(900.0, 900.0),
-        lens_pitch_nm=(2000, 2000),
-        footprint_radius_nm=600.0, lens_height_nm=400.0,
-    )
-    xx, yy = np.meshgrid(
-        np.arange(image.values.shape[1]) * image.pixel_size_x,
-        np.arange(image.values.shape[0]) * image.pixel_size_y,
-    )
-    plt.imshow(image.values, extent=(xx.min(), xx.max(), yy.min(), yy.max()))
-    plt.colorbar(label=f"Height ({image.data_unit})")
-    plt.xlabel(f"X ({image.xy_unit})")
-    plt.ylabel(f"Y ({image.xy_unit})")
-    plt.show()
-    print(len(ground_truth))

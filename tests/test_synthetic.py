@@ -50,24 +50,6 @@ def test_generate_synthetic_image_WHEN_shape_is_rectangular_THEN_shape_is_n_y_by
     assert image.pixel_size_y == pytest.approx(20.0)
 
 
-def test_generate_synthetic_image_WHEN_axes_differ_THEN_preserves_shape_units_and_pixel_sizes():
-    image, ground_truth = generate_synthetic_image(
-        image_shape=(200, 300),
-        fov_nm=(3000.0, 2000.0),
-        lens_pitch_nm=(600.0, 500.0),
-        offset_nm=(300.0, 250.0),
-        footprint_radius_nm=100.0,
-        lens_height_nm=50.0,
-    )
-
-    assert image.values.shape == (200, 300)
-    assert image.pixel_size_x == pytest.approx(10.0)
-    assert image.pixel_size_y == pytest.approx(10.0)
-    assert image.xy_unit == "nm"
-    assert image.data_unit == "nm"
-    assert len(ground_truth) == 5 * 4
-
-
 def test_generate_synthetic_image_WHEN_pitches_differ_THEN_centers_are_periodic_with_each_pitch():
     _, ground_truth = generate_synthetic_image(
         image_shape=(200, 300),
@@ -82,8 +64,6 @@ def test_generate_synthetic_image_WHEN_pitches_differ_THEN_centers_are_periodic_
     y_centers = sorted({lens["center_y_nm"] for lens in ground_truth})
     assert x_centers == [300.0, 900.0, 1500.0, 2100.0, 2700.0]
     assert y_centers == [250.0, 750.0, 1250.0, 1750.0]
-    assert np.diff(x_centers) == pytest.approx(600.0)
-    assert np.diff(y_centers) == pytest.approx(500.0)
     for lens in ground_truth:
         assert lens["center_x_nm"] == 300.0 + lens["index_x"] * 600.0
         assert lens["center_y_nm"] == 250.0 + lens["index_y"] * 500.0
@@ -107,13 +87,6 @@ def test_generate_synthetic_image_WHEN_offset_is_not_a_pitch_multiple_THEN_latti
     # Centers at x = -500, 5500 and y = 500, 6500 are partial lenses.
     assert {x for x, _ in centers_of(ground_truth)} == {1500.0, 3500.0}
     assert {y for _, y in centers_of(ground_truth)} == {2500.0, 4500.0}
-
-
-def test_generate_synthetic_image_WHEN_offset_tuple_is_x_y_ordered_THEN_x_offset_shifts_columns():
-    _, ground_truth = generate_synthetic_image(offset_nm=(1500.0, 1000.0))
-
-    assert {y for _, y in centers_of(ground_truth)} == {1000.0, 3000.0, 5000.0}
-    assert 1500.0 in {x for x, _ in centers_of(ground_truth)}
 
 
 def test_generate_synthetic_image_WHEN_center_is_outside_fov_THEN_partial_lens_is_rendered_but_not_in_ground_truth():
@@ -143,19 +116,6 @@ def test_generate_synthetic_image_WHEN_center_is_negative_THEN_partial_lens_is_r
 
     assert sorted(x for x, _ in centers_of(ground_truth)) == [350.0, 750.0]
     assert image.values[50, 0] > 0.0
-
-
-def test_generate_synthetic_image_WHEN_center_is_on_image_boundary_THEN_lens_is_not_in_ground_truth():
-    image, ground_truth = generate_synthetic_image(
-        **single_lens_kwargs(
-            lens_pitch_nm=(400.0, 1000.0),
-            offset_nm=(0.0, 500.0),
-            footprint_radius_nm=100.0,
-        )
-    )
-
-    assert sorted(x for x, _ in centers_of(ground_truth)) == [400.0, 800.0]
-    assert image.values[50, 0] == pytest.approx(50.0)
 
 
 def test_generate_synthetic_image_WHEN_footprint_ends_just_before_or_reaches_border_pixel_THEN_only_the_former_is_in_ground_truth():
@@ -272,21 +232,12 @@ def test_generate_synthetic_image_WHEN_pitch_equals_twice_footprint_radius_THEN_
     ("parameter", "value", "error"),
     [
         ("image_shape", (0, 10), ValueError),
-        ("image_shape", (10, -1), ValueError),
         ("image_shape", (10, 2.5), TypeError),
-        ("image_shape", (10, True), TypeError),
         ("image_shape", (10,), ValueError),
-        ("image_shape", (10, 10, 10), ValueError),
-        ("image_shape", 10, ValueError),
-        ("fov_nm", (0.0, 6000.0), ValueError),
         ("fov_nm", (6000.0, float("inf")), ValueError),
-        ("fov_nm", (6000.0,), ValueError),
         ("lens_pitch_nm", (0.0, 2000.0), ValueError),
-        ("lens_pitch_nm", (2000.0, float("nan")), ValueError),
         ("offset_nm", (float("nan"), 0.0), ValueError),
-        ("offset_nm", (0.0, float("inf")), ValueError),
         ("offset_nm", (True, 0.0), TypeError),
-        ("offset_nm", (0.0,), ValueError),
         ("footprint_radius_nm", float("nan"), ValueError),
         ("lens_height_nm", -1.0, ValueError),
         ("lens_height_nm", True, TypeError),

@@ -7,11 +7,25 @@ Analyze a 2D height map of spherical microlenses, then export a table of per-len
 Initial representative dataset:
 - Field of view: approximately **6 µm × 6 µm** (6000 nm × 6000 nm).
 - Image: approximately **1024 × 1024** samples.
-- Array: approximately **3 × 3** spherical microlenses.
+- Array: periodic rectangular lattice of spherical microlenses (about **3 × 3** fully visible lenses with the default settings).
 - Lens height: approximately **500 nm**.
 - Physical lateral and height units: **nm**. The image metadata, not hardcoded constants, determines coordinate scaling.
 
 These are starting conditions, not fixed requirements for all images.
+
+### Synthetic data generator
+
+`generate_synthetic_image` (`src/microlens/synthetic.py`) renders a periodic lens array observed through a fixed field of view and returns an `Image` plus per-lens ground truth.
+
+- Inputs: `image_shape` as `(n_y, n_x)`, and `fov_nm`, `lens_pitch_nm`, `offset_nm` as `(x, y)` pairs, plus footprint radius `a` and geometric lens height `h`. Defaults: 1024 × 1024 px, 6000 × 6000 nm, pitch 2000 nm, offset 1000 nm, `a = 750` nm, `h = 500` nm.
+- Pixel sizes are `fov / n`; pixel centers follow the `Image` convention (`x = column * pixel_size_x`, `y = row * pixel_size_y`), so the last pixel center lies one pixel short of the FoV edge. Units are nm for both lateral and height values.
+- Lens centers lie on the lattice `x_i = offset_x + i * pitch_x`, `y_j = offset_y + j * pitch_y` for all integers `i, j` (negative allowed). The FoV is fixed; offsets shift the lattice. Centers may lie outside the image.
+- Each lens is a spherical cap on a flat substrate at `z = 0`: `R = (a² + h²) / (2h)` and `z(r) = sqrt(R² - r²) - (R - h)` for `r < a`. The apex is at `h` and the footprint edge at `z = 0`.
+- Constraints: `h <= a` (at most a hemisphere, so the cap is single-valued) and `pitch >= 2a` on both axes (no overlapping lenses).
+- A lens, including a partially visible one, is rendered in the image if at least one pixel center lies strictly inside its footprint (`distance < a`). Lenses that only touch a pixel at the footprint edge (zero height) are not rendered.
+- Partial lenses are excluded from the ground truth. A lens is partial if any pixel inside its footprint lies in the first or last row or column of the image; partial lenses remain in the image.
+- Ground truth, one entry per complete lens, ordered by `index_y` then `index_x`: lattice indices `index_x`, `index_y`, physical center `center_x_nm`, `center_y_nm`, `sphere_radius_nm`, `footprint_radius_nm`, and `geometric_height_nm`.
+- Noise and substrate tilt are not generated yet.
 
 ## Data model: `Image`
 

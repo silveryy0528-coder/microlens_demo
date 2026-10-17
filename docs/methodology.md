@@ -1,116 +1,70 @@
-# Microlens characterization: methodology and data contracts
+# Microlens characterization: methodology
 
 ## Goal and scope
 
-Analyze a 2D height map of spherical microlenses, then export a table of per-lens parameters and diagnostic image artifacts. The first version uses **synthetic data only** and reports two physical measurements: **radius of curvature** and **lens height**.
+Characterize spherical microlenses in 2D height maps and export per-lens **radius of curvature** and **profile-based height**, together with diagnostic figures. Initially, use synthetic images with analytical ground truth.
 
-Initial representative dataset:
-- Field of view: approximately **6 µm × 6 µm** (6000 nm × 6000 nm).
-- Image: approximately **1024 × 1024** samples.
-- Array: periodic rectangular lattice of spherical microlenses (about **3 × 3** fully visible lenses with the default settings).
-- Lens height: approximately **500 nm**.
-- Physical lateral and height units: **nm**. The image metadata, not hardcoded constants, determines coordinate scaling.
+A representative dataset covers approximately **6000 × 6000 nm** at **1024 × 1024** pixels, with a periodic array of lenses about **500 nm** high. These are example conditions, not fixed constraints. Physical scaling comes from image metadata.
 
-These are starting conditions, not fixed requirements for all images.
+## Image data model
 
-### Synthetic data generator
+The `Image` class stores:
 
-`generate_synthetic_image` (`src/microlens/synthetic.py`) renders a periodic lens array observed through a fixed field of view and returns an `Image` plus per-lens ground truth.
+- `values`: 2D NumPy array indexed `[row_y, column_x]`.
+- `pixel_size_x`, `pixel_size_y`: physical spacing between sample centers.
+- `xy_unit`: lateral distance unit; `data_unit`: height unit.
 
-- Inputs: `image_shape` as `(n_y, n_x)`, and `fov_nm`, `lens_pitch_nm`, `offset_nm` as `(x, y)` pairs, plus footprint radius `a` and geometric lens height `h`. Defaults: 1024 × 1024 px, 6000 × 6000 nm, pitch 2000 nm, offset 1000 nm, `a = 750` nm, `h = 500` nm.
-- Pixel sizes are `fov / n`; pixel centers follow the `Image` convention (`x = column * pixel_size_x`, `y = row * pixel_size_y`), so the last pixel center lies one pixel short of the FoV edge. Units are nm for both lateral and height values.
-- Lens centers lie on the lattice `x_i = offset_x + i * pitch_x`, `y_j = offset_y + j * pitch_y` for all integers `i, j` (negative allowed). The FoV is fixed; offsets shift the lattice. Centers may lie outside the image.
-- Each lens is a spherical cap on a flat substrate at `z = 0`: `R = (a² + h²) / (2h)` and `z(r) = sqrt(R² - r²) - (R - h)` for `r < a`. The apex is at `h` and the footprint edge at `z = 0`.
-- Constraints: `h <= a` (at most a hemisphere, so the cap is single-valued) and `pitch >= 2a` on both axes (no overlapping lenses).
-- A lens, including a partially visible one, is rendered in the image if at least one pixel center lies strictly inside its footprint (`distance < a`). Lenses that only touch a pixel at the footprint edge (zero height) are not rendered.
-- Partial lenses are excluded from the ground truth. A lens is partial if any pixel inside its footprint lies in the first or last row or column of the image; partial lenses remain in the image.
-- Ground truth, one entry per complete lens, ordered by `index_y` then `index_x`: lattice indices `index_x`, `index_y`, physical center `center_x_nm`, `center_y_nm`, `sphere_radius_nm`, `footprint_radius_nm`, and `geometric_height_nm`.
-- Noise and substrate tilt are not generated yet.
+Pixel-center coordinates are `x = column * pixel_size_x` and `y = row * pixel_size_y`. Preserve metadata during processing; do not assume isotropic spacing or identical lateral and height units. Initially, record units without conversion.
 
-## Data model: `Image`
+## Synthetic reference geometry
 
-Use a lightweight `Image` class (suggested location: `src/microlens/image.py`) to carry both the measured values and their physical sampling metadata:
+Generate a rectangular periodic lattice of identical spherical-cap lenses on a flat substrate, viewed through a fixed field of view. Lens centers are
 
-```python
-image = Image(
-    values=height_map,       # 2D NumPy array: [row_y, column_x]
-    pixel_size_x=5.86,       # lateral spacing between columns
-    pixel_size_y=5.86,       # lateral spacing between rows
-    xy_unit="nm",           # units of pixel_size_x and pixel_size_y
-    data_unit="nm",         # units of height values
-)
-```
+\[
+x_i = x_{\mathrm{offset}} + i p_x, \qquad y_j = y_{\mathrm{offset}} + j p_y,
+\]
 
-The numerical pixel sizes above are **illustrative**, approximating a 6000 nm field of view sampled at 1024 pixels. The synthetic generator must supply its actual values consistently.
+where `i` and `j` may be negative. Shifting the offsets changes which lenses are visible, including those cut off by image boundaries.
 
-Coordinate convention for the initial implementation:
-- `values.shape == (n_y, n_x)`; columns represent `x`, rows represent `y`.
-- Pixel-center coordinates are `x = column * pixel_size_x` and `y = row * pixel_size_y`.
-- `xy_unit` applies to both lateral pixel sizes; `data_unit` applies to `values`.
-- Preserve these fields through processing. Do not assume that lateral and height units are interchangeable or that pixel spacing is isotropic.
-- Initially, **record units without converting them**. Unit-conversion methods are explicitly out of scope for the first version.
+For footprint radius `a`, geometric height `h`, and radial distance `r` from a lens center:
+
+\[
+R = \frac{a^2 + h^2}{2h}, \qquad
+z(r) =
+\begin{cases}
+\sqrt{R^2-r^2}-(R-h), & r<a,\\
+0, & r\ge a.
+\end{cases}
+\]
+
+Require `0 < h <= a` and `pitch_x, pitch_y >= 2a` to model single-valued, nonoverlapping caps.
+
+Render complete and partial lenses when at least one sampled pixel center lies strictly inside their footprint (`r < a`). **Ground truth includes only complete lenses**, with their lattice indices, physical centers, radius `R`, footprint radius, and geometric height. Under the current sampled-image convention, a lens is considered partial if its footprint contains a sampled pixel center in the first or last image row or column. Partial lenses remain in the image but are outside the intended characterization and validation scope.
 
 ## Processing methodology
 
 ### 1. Background correction
 
-1. Identify **low-height substrate pixels** and exclude microlens regions from the fit.
-2. Fit a plane to the selected substrate pixels in physical `x, y, z` coordinates.
-3. Subtract that fitted plane to flatten the substrate.
-
-The precise substrate-pixel selection/masking rule remains to be specified. Do not fit a plane to all pixels indiscriminately.
+Select low-height **substrate pixels**, excluding microlenses. Fit a plane in physical `(x, y, z)` coordinates and subtract it. The substrate-selection rule remains to be defined.
 
 ### 2. Lens detection
 
-1. Apply **percentile-based thresholding** to the background-corrected height map.
-2. Identify individual microlens regions to analyze.
+Apply percentile-based thresholding to the corrected height map and identify individual lens regions. Threshold and region-filtering criteria remain to be defined. Exclude partial lenses from characterization.
 
-The threshold percentile and any component-filtering rules remain to be specified.
+### 3. Apex localization and radius
 
-### 3. Apex localization and curvature
+Fit a sphere in physical 3D coordinates to each selected lens and use the fit to locate its apex with subpixel precision. Report **sphere radius `R` in nm**, not reciprocal curvature. Fit-region and numerical-method choices remain to be defined.
 
-1. Fit a **sphere in physical 3D coordinates** to each detected lens region.
-2. Use the fitted sphere to localize the apex at subpixel precision.
-3. Report the **radius of curvature `R` (nm)** from the fitted sphere, **not** the reciprocal curvature `1/R`.
+### 4. Profile-based height
 
-Fit-region selection, sign conventions, and optimization details will be specified when implementing this stage.
+Interpolate a 1D profile through the fitted apex, including the lens and surrounding substrate. Compute **lens height = P99(profile) − P5(profile)** over valid samples. This is *not* necessarily the analytical spherical-cap height. Profile orientation, extent, and sampling remain to be defined.
 
-### 4. Apex-centered profile and lens height
+### 5. Outputs
 
-1. Extract an **interpolated 2D height profile through the fitted apex**; the apex need not coincide with a pixel center.
-2. Include the intended lens and surrounding baseline in the sampled profile.
-3. Define lens height as **`P99(profile) - P5(profile)`**, using all valid sampled profile values.
-
-Profile orientation, total length, sample spacing, and out-of-bounds handling remain to be specified. Do not substitute a fitted sphere's cap height for this measured profile statistic.
-
-### 5. Results and artifacts
-
-- Report one row per detected lens, including lens ID, apex coordinates, radius of curvature (nm), and lens height (nm).
-- Write a machine-readable results table (CSV initially) and diagnostic visualizations (for example, corrected height map, detection overlay, and extracted profiles).
-- Preserve relevant pixel metadata and configuration for interpretability and reproducibility.
-
-## Intended software organization
-
-- `Image` stores the array and sampling metadata; it should not contain the entire analysis pipeline.
-- `UseCaseMicrolens` orchestrates `preprocess()` and `process()`. `process()` should perform the complete analysis, calling preprocessing as needed.
-- Keep plane fitting, detection, sphere fitting, and profile extraction in small testable numerical functions; a single `algorithms.py` is sufficient initially.
-- Expose `scripts/process_single_image.py` and `scripts/batch_process_images.py` as entry points, without a notebook or GUI.
-- Keep file I/O, artifact export, and plotting separate from the numerical implementation.
-
-The precise Python method signatures and result containers should be agreed on before implementation; no large interface hierarchy is required.
+Export one result row per characterized lens (ID, apex position, radius, and height), plus diagnostic figures. Preserve relevant image metadata and processing configuration.
 
 ## Verification strategy
 
-**Software tests:** Check small contracts independently (for example, `Image` array/metadata handling, coordinate mapping, and bilinear interpolation on a known grid).
+**Software tests** check isolated contracts, such as image metadata, coordinate mapping, and interpolation on known grids.
 
-**Scientific validation:** Generate spherical-cap height maps with known radius, apex, and substrate tilt. Run the pipeline and compare recovered values with analytical ground truth. Include subpixel apex locations and later vary noise, sampling, and lens geometry.
-
-For the **height** metric, compute the expected `P99 - P5` from an independently specified synthetic reference profile with the same sampling convention; do not automatically equate it to the ideal spherical-cap apex-to-rim height.
-
-## Decisions to make during implementation
-
-- Rule for choosing substrate pixels for plane fitting (including lens exclusion).
-- Detection percentile and rules for separating/filtering lenses.
-- Sphere-fitting mask, numerical method, and apex convention.
-- Profile direction, extent, interpolation method, and sampling density.
-- Handling failed fits, edge lenses, NaNs, and missing background pixels.
+**Scientific validation** compares the analysis outputs with independent expectations from synthetic spherical caps, including subpixel centers and, later, substrate tilt, noise, and varied sampling. Radius is compared with analytical `R`; expected profile-based height must be calculated using the **same profile sampling convention**, not assumed equal to geometric cap height. Partial lenses are excluded from ground-truth comparisons.

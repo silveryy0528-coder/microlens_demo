@@ -126,30 +126,3 @@ def generate_synthetic_image(
         data_unit="nm",
     )
     return image, ground_truth
-
-
-if __name__ == "__main__":
-    import matplotlib.pyplot as plt
-    image, ground_truth = generate_synthetic_image(
-        n_x=1000,
-        n_y=400,
-        lenses_x=2,
-        lenses_y=4,
-        fov_x_nm=6000.0,
-        fov_y_nm=6000.0,
-        footprint_radius_nm=650.0,
-        lens_height_nm=500.0,
-    )
-    plt.figure()
-    xx, yy = np.meshgrid(
-        image.pixel_size_x * np.arange(image.values.shape[1]),
-        image.pixel_size_y * np.arange(image.values.shape[0]))
-    plt.pcolormesh(xx, yy, image.values, cmap="viridis")
-    plt.colorbar(label=f"{image.data_unit}")
-    plt.show()
-
-    plt.figure()
-    plt.plot(image.values[227, :])
-    plt.xlabel("X Pixel")
-    plt.ylabel(f"{image.data_unit}")
-    plt.show()

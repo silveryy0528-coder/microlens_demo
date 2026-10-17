@@ -5,7 +5,10 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "microlens"
 version = "0.1.0"
-dependencies = ["numpy"]
+dependencies = [
+    "numpy",
+    "matplotlib"
+]
 
 [project.optional-dependencies]
 test = ["pytest"]

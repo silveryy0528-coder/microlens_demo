@@ -110,11 +110,45 @@ def test_generate_synthetic_image_WHEN_cap_is_generated_THEN_ground_truth_matche
         (x_nm - lens["center_x_nm"]) ** 2
         + (y_nm - lens["center_y_nm"]) ** 2
     )
-    expected_height_nm = expected_radius_nm - np.sqrt(
-        expected_radius_nm**2 - distance_squared
+    expected_height_nm = np.sqrt(expected_radius_nm**2 - distance_squared) - (
+        expected_radius_nm - 50.0
     )
     assert image.values[row, column] == pytest.approx(expected_height_nm)
     assert image.values[0, 0] == 0.0
+
+
+def test_generate_synthetic_image_WHEN_apex_is_on_pixel_THEN_lens_is_a_bump_with_edge_at_substrate():
+    # Pixel (50, 50) is the lens center; pixel (50, 70) is at the footprint edge.
+    image, _ = generate_synthetic_image(
+        n_x=100,
+        n_y=100,
+        fov_x_nm=1000.0,
+        fov_y_nm=1000.0,
+        lenses_x=1,
+        lenses_y=1,
+        footprint_radius_nm=200.0,
+        lens_height_nm=50.0,
+    )
+
+    assert image.values[50, 50] == pytest.approx(50.0)
+    assert image.values[50, 70] == pytest.approx(0.0, abs=1e-9)
+    assert image.values[50, 60] < image.values[50, 50]
+    assert image.values[50, 60] > image.values[50, 70]
+    assert image.values.min() >= 0.0
+    assert image.values.max() <= 50.0
+
+
+def test_generate_synthetic_image_WHEN_height_exceeds_footprint_radius_THEN_raises_value_error():
+    with pytest.raises(ValueError, match="must not exceed footprint radius"):
+        generate_synthetic_image(footprint_radius_nm=400.0, lens_height_nm=401.0)
+
+
+def test_generate_synthetic_image_WHEN_height_equals_footprint_radius_THEN_hemisphere_is_accepted():
+    _, ground_truth = generate_synthetic_image(
+        footprint_radius_nm=400.0, lens_height_nm=400.0
+    )
+
+    assert ground_truth[0]["sphere_radius_nm"] == pytest.approx(400.0)
 
 
 def test_generate_synthetic_image_WHEN_anisotropic_sampling_is_used_THEN_preserves_physical_scales():

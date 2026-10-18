@@ -137,21 +137,3 @@ def select_substrate_mask(
 
     threshold = np.percentile(data, percentile) + distance
     return data < threshold
-
-
-if __name__ == "__main__":
-    image_data = np.zeros((10, 10))
-    image_data[:, 2:4] = 1
-    mask = select_substrate_mask(image_data, distance=0.5)
-    data_flat, coefficients = fit_and_subtract_plane(image_data, (1, 1), mask=mask)
-    import matplotlib.pyplot as plt
-    fig = plt.figure()
-    fig.add_subplot(2, 2, 1)
-    plt.imshow(image_data, cmap='gray')
-    fig.add_subplot(2, 2, 2)
-    plt.imshow(mask, cmap='gray')
-    fig.add_subplot(2, 2, 3)
-    plt.plot(image_data[0])
-    fig.add_subplot(2, 2, 4)
-    plt.plot(data_flat[0])
-    plt.show()

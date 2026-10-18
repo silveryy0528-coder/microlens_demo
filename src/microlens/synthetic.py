@@ -98,9 +98,9 @@ def generate_synthetic_image(
 
     pixel_size_x = fov_x_nm / n_x
     pixel_size_y = fov_y_nm / n_y
-    sphere_radius_nm = (
-        footprint_radius_nm**2 + lens_height_nm**2
-    ) / (2 * lens_height_nm)
+    sphere_radius_nm = (footprint_radius_nm**2 + lens_height_nm**2) / (
+        2 * lens_height_nm
+    )
     x_coordinates = np.arange(n_x) * pixel_size_x
     y_coordinates = np.arange(n_y) * pixel_size_y
 
@@ -121,9 +121,7 @@ def generate_synthetic_image(
             offset_x_nm, lens_pitch_x_nm, x_coordinates[-1]
         ):
             center_x_nm = offset_x_nm + index_x * lens_pitch_x_nm
-            distance_squared = (
-                (x_grid - center_x_nm) ** 2 + (y_grid - center_y_nm) ** 2
-            )
+            distance_squared = (x_grid - center_x_nm) ** 2 + (y_grid - center_y_nm) ** 2
             inside_footprint = distance_squared < footprint_radius_nm**2
             if not inside_footprint.any():
                 continue
@@ -163,7 +161,3 @@ def generate_synthetic_image(
         data_unit="nm",
     )
     return image, ground_truth
-
-
-if __name__ == "__main__":
-    image, ground_truth = generate_synthetic_image(offset_nm=(1400., 1400.))

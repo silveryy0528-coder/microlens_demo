@@ -1,7 +1,11 @@
 import numpy as np
 import pytest
 
-from microlens.algorithms import fit_and_subtract_plane, select_substrate_mask
+from microlens.algorithms import (
+    dilate_mask_by_distance,
+    fit_and_subtract_plane,
+    select_substrate_mask,
+)
 
 
 def test_fit_and_subtract_plane_WHEN_analytic_plane_and_no_mask_THEN_corrects_all_pixels():
@@ -155,3 +159,64 @@ def test_select_substrate_mask_WHEN_image_is_malformed_or_nonfinite_THEN_raises(
 ):
     with pytest.raises((TypeError, ValueError)):
         select_substrate_mask(image_data)
+
+
+def test_dilate_mask_by_distance_WHEN_spacing_is_anisotropic_THEN_matches_physical_euclidean_disk():
+    mask = np.zeros((5, 5), dtype=bool)
+    mask[2, 2] = True
+    expected = np.zeros_like(mask)
+    expected[2, 2] = True
+    expected[0, 2] = True
+    expected[1, 2] = True
+    expected[3, 2] = True
+    expected[4, 2] = True
+    expected[2, 1] = True
+    expected[2, 3] = True
+
+    actual = dilate_mask_by_distance(mask, pixel_size=(2.0, 1.0), distance=2.0)
+
+    np.testing.assert_array_equal(actual, expected)
+
+
+def test_dilate_mask_by_distance_WHEN_seed_is_at_boundary_THEN_dilation_is_clipped_to_image():
+    mask = np.zeros((3, 3), dtype=bool)
+    mask[0, 0] = True
+    expected = np.array(
+        [[True, True, False], [True, False, False], [False, False, False]]
+    )
+
+    actual = dilate_mask_by_distance(mask, pixel_size=(1.0, 1.0), distance=1.0)
+
+    np.testing.assert_array_equal(actual, expected)
+
+
+def test_dilate_mask_by_distance_WHEN_distance_is_zero_or_mask_empty_THEN_returns_copy_or_empty_mask():
+    mask = np.array([[True, False], [False, False]])
+    zero_distance = dilate_mask_by_distance(mask, (1.0, 2.0), distance=0.0)
+    empty_distance = dilate_mask_by_distance(
+        np.zeros((2, 3), dtype=bool), (1.0, 2.0), distance=3.0
+    )
+
+    np.testing.assert_array_equal(zero_distance, mask)
+    assert zero_distance is not mask
+    np.testing.assert_array_equal(empty_distance, np.zeros((2, 3), dtype=bool))
+    np.testing.assert_array_equal(mask, np.array([[True, False], [False, False]]))
+
+
+@pytest.mark.parametrize(
+    ("mask", "pixel_size", "distance"),
+    [
+        (np.array([True, False]), (1.0, 1.0), 1.0),
+        (np.array([[1, 0]], dtype=int), (1.0, 1.0), 1.0),
+        (np.zeros((2, 2), dtype=bool), (1.0,), 1.0),
+        (np.zeros((2, 2), dtype=bool), (0.0, 1.0), 1.0),
+        (np.zeros((2, 2), dtype=bool), (1.0, np.inf), 1.0),
+        (np.zeros((2, 2), dtype=bool), (1.0, 1.0), -1.0),
+        (np.zeros((2, 2), dtype=bool), (1.0, 1.0), float("nan")),
+    ],
+)
+def test_dilate_mask_by_distance_WHEN_inputs_are_invalid_THEN_raises_value_error(
+    mask, pixel_size, distance
+):
+    with pytest.raises(ValueError):
+        dilate_mask_by_distance(mask, pixel_size, distance)

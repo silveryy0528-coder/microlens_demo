@@ -4,6 +4,7 @@ import math
 from numbers import Real
 
 import numpy as np
+from scipy.ndimage import distance_transform_edt
 
 
 def fit_and_subtract_plane(
@@ -65,7 +66,9 @@ def fit_and_subtract_plane(
     else:
         fit_mask = np.asarray(mask)
         if fit_mask.dtype != np.dtype(bool) or fit_mask.shape != data.shape:
-            raise ValueError("mask must be a Boolean array with the same shape as image_data")
+            raise ValueError(
+                "mask must be a Boolean array with the same shape as image_data"
+            )
 
     data = data.astype(float, copy=False)
     rows, columns = np.indices(data.shape)
@@ -137,3 +140,64 @@ def select_substrate_mask(
 
     threshold = np.percentile(data, percentile) + distance
     return data < threshold
+
+
+def dilate_mask_by_distance(
+    mask: np.ndarray,
+    pixel_size: tuple[float, float],
+    distance: float,
+) -> np.ndarray:
+    """Dilate a Boolean mask by a physical Euclidean distance.
+
+    Pixel spacing is supplied as ``(x, y)``; EDT sampling is reordered to
+    ``(y, x)`` to match NumPy's ``[row_y, column_x]`` array axes.
+
+    Parameters
+    ----------
+    mask : numpy.ndarray
+        2D Boolean array where ``True`` indicates the region to dilate.
+    pixel_size : tuple[float, float]
+        Physical size of a pixel in the ``(x, y)`` directions.
+    distance : float
+        Physical Euclidean distance by which to dilate the mask.
+
+    Returns
+    -------
+    numpy.ndarray of bool
+        Dilated Boolean mask.
+
+    Raises
+    ------
+    ValueError
+        If an input is invalid.
+    """
+    mask_array = np.asarray(mask)
+    if mask_array.ndim != 2 or mask_array.dtype != np.dtype(bool):
+        raise ValueError("mask must be a 2D Boolean array")
+    if not isinstance(pixel_size, (tuple, list, np.ndarray)) or len(pixel_size) != 2:
+        raise ValueError("pixel_size must contain exactly two values")
+    for value in pixel_size:
+        if (
+            isinstance(value, (bool, np.bool_))
+            or not isinstance(value, Real)
+            or not math.isfinite(value)
+            or value <= 0
+        ):
+            raise ValueError("pixel_size values must be positive finite real numbers")
+    if (
+        isinstance(distance, (bool, np.bool_))
+        or not isinstance(distance, Real)
+        or not math.isfinite(distance)
+        or distance < 0
+    ):
+        raise ValueError("distance must be a finite non-negative real number")
+
+    if distance == 0:
+        return mask_array.copy()
+    if not mask_array.any():
+        return np.zeros(mask_array.shape, dtype=bool)
+
+    distance_map = distance_transform_edt(
+        ~mask_array, sampling=(pixel_size[1], pixel_size[0])
+    )
+    return distance_map <= distance

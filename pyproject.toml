@@ -7,7 +7,8 @@ name = "microlens"
 version = "0.1.0"
 dependencies = [
     "numpy",
-    "matplotlib"
+    "matplotlib",
+    "scipy"
 ]
 
 [project.optional-dependencies]

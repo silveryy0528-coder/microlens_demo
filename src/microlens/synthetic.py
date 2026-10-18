@@ -163,3 +163,7 @@ def generate_synthetic_image(
         data_unit="nm",
     )
     return image, ground_truth
+
+
+if __name__ == "__main__":
+    image, ground_truth = generate_synthetic_image(offset_nm=(1400., 1400.))

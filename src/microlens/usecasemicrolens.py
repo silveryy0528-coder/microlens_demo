@@ -1,9 +1,14 @@
 """Use case orchestration for microlens image processing."""
 import copy
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 
 from microlens.image import Image
-from microlens.settings import PreprocessingSettings, SubstrateSettings
+from microlens.settings import (
+    PreprocessingSettings,
+    SubstrateSettings,
+    read_yaml,
+    write_yaml,
+)
 
 
 @dataclass(frozen=True)
@@ -28,7 +33,6 @@ class MicrolensSettings:
             settings_data["preprocessing"] = PreprocessingSettings(
                 **preprocessing_data
             )
-        print(data, settings_data)
 
         return cls(**settings_data)
 
@@ -53,7 +57,23 @@ class UseCaseMicrolens:
         self.processing_completed = False
         self.settings = None
 
+    def load_settings(self, path) -> None:
+        """Load validated settings and invalidate previous processing results."""
+        settings = MicrolensSettings.from_dict(read_yaml(path))
+        self.settings = settings
+        self.preprocessed_image = None
+        self.preprocessing_completed = False
+        self.processing_completed = False
+
+    def save_settings(self, path) -> None:
+        """Save the currently loaded settings."""
+        if self.settings is None:
+            raise RuntimeError("settings must be loaded before they can be saved")
+        write_yaml(path, asdict(self.settings))
+
     def preprocess_image(self) -> None:
+        if self.settings is None:
+            raise RuntimeError("settings must be loaded before preprocessing")
         self.processing_completed = False
         self.preprocessed_image = self.background_correction(self.image)
         self.preprocessing_completed = True

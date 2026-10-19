@@ -2,6 +2,40 @@
 from dataclasses import dataclass
 import math
 from numbers import Rational, Real
+from pathlib import Path
+
+import yaml
+
+
+def read_yaml(path: str | Path) -> dict:
+    """Read a YAML file whose root value is a dictionary."""
+    path = Path(path)
+    try:
+        with path.open(encoding="utf-8") as stream:
+            data = yaml.safe_load(stream)
+    except yaml.YAMLError as error:
+        raise ValueError(f"Invalid YAML in {path}: {error}") from error
+
+    if not isinstance(data, dict):
+        raise ValueError(f"YAML root in {path} must be a dictionary")
+    return data
+
+
+def write_yaml(path: str | Path, data: dict) -> None:
+    """Write a dictionary to a YAML file using safe serialization."""
+    if not isinstance(data, dict):
+        raise TypeError("data must be a dictionary")
+
+    path = Path(path)
+    try:
+        serialized = yaml.safe_dump(data, sort_keys=False)
+    except yaml.YAMLError as error:
+        raise TypeError(
+            f"data contains values that cannot be serialized to YAML: {error}"
+        ) from error
+
+    with path.open("w", encoding="utf-8") as stream:
+        stream.write(serialized)
 
 
 def _require_finite_real(name: str, value: object) -> None:

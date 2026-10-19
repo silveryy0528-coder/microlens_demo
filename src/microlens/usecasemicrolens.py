@@ -1,7 +1,20 @@
 """Use case orchestration for microlens image processing."""
 import copy
+from dataclasses import dataclass
 
 from .image import Image
+from .settings import PreprocessingSettings
+
+
+@dataclass(frozen=True)
+class MicrolensSettings:
+    """Settings for a microlens characterization run."""
+
+    preprocessing: PreprocessingSettings
+
+    def __post_init__(self) -> None:
+        if not isinstance(self.preprocessing, PreprocessingSettings):
+            raise TypeError("preprocessing must be a PreprocessingSettings instance")
 
 
 class UseCaseMicrolens:

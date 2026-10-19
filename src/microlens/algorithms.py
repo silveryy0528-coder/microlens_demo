@@ -1,4 +1,4 @@
-"""Numerical algorithms for microlens height maps."""
+"""Numerical algorithms operating on height maps."""
 
 import math
 from numbers import Real

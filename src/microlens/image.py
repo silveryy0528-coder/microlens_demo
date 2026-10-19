@@ -1,4 +1,4 @@
-"""Data model for height maps and their physical sampling metadata."""
+"""Image class with image data and physical sampling metadata."""
 
 from dataclasses import dataclass
 import math

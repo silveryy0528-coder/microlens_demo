@@ -1,12 +1,9 @@
 """Generate and save synthetic microlens datasets under ``data/synthetic``.
 
-All images share the same shape, FoV, pitch, and lens geometry.
-Per image ``NN`` the script writes:
-
-- ``data_file_synthetic_NN.csv``: height values only, no headers or indices.
-- ``metadata_synthetic_NN.json``: image metadata, generation parameters, and
-  the analytical ground truth of the complete (non-border-touching) lenses.
-- ``2d_image_plot_synthetic_NN.png`` and ``1d_cross_section_synthetic_NN.png``.
+Parameters are read from ``configs/generation_settings.yaml``. Images differ
+by lattice offset (deterministic phase shift) and a seeded random substrate
+tilt. Per image ``NN`` the script writes a height-only CSV, a JSON with
+metadata, generation parameters, and ground truth, and two diagnostic plots.
 """
 
 import json

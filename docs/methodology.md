@@ -41,6 +41,9 @@ Require `0 < h <= a` and `pitch_x, pitch_y >= 2a` to model single-valued, nonove
 
 Render complete and partial lenses when at least one sampled pixel center lies strictly inside their footprint (`r < a`). **Ground truth includes only complete lenses**, with their lattice indices, physical centers, radius `R`, footprint radius, and geometric height. Under the current sampled-image convention, a lens is considered partial if its footprint contains a sampled pixel center in the first or last image row or column. Partial lenses remain in the image but are outside the intended characterization and validation scope.
 
+### Substrate tilt
+
+An optional planar tilt `z = a x + b y` is added to the ideal image, using the pixel-center coordinates above, so it is zero at pixel `(0, 0)`. The slope `(a, b)` is in `data_unit` per `xy_unit`, without unit conversion. Ground truth is unchanged: lens heights are relative to the local substrate, not absolute apex `z`.
 ## Processing methodology
 
 ### 1. Background correction
@@ -67,4 +70,4 @@ Export one result row per characterized lens (ID, apex position, radius, and hei
 
 **Software tests** check isolated contracts, such as image metadata, coordinate mapping, and interpolation on known grids.
 
-**Scientific validation** compares the analysis outputs with independent expectations from synthetic spherical caps, including subpixel centers and, later, substrate tilt, noise, and varied sampling. Radius is compared with analytical `R`; expected profile-based height must be calculated using the **same profile sampling convention**, not assumed equal to geometric cap height. Partial lenses are excluded from ground-truth comparisons.
+**Scientific validation** compares the analysis outputs with independent expectations from synthetic spherical caps, including subpixel centers and substrate tilt, noise, and varied sampling. Radius is compared with analytical `R`; expected profile-based height must be calculated using the **same profile sampling convention**, not assumed equal to geometric cap height. Partial lenses are excluded from ground-truth comparisons.

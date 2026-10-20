@@ -1,4 +1,7 @@
-"""Generate analytical synthetic microlens height maps."""
+"""Generate synthetic microlens height maps with analytical ground truth.
+
+Geometry and conventions follow ``docs/methodology.md``.
+"""
 
 import math
 import copy
@@ -13,7 +16,16 @@ def generate_synthetic_image(
     slope_xy: tuple[float, float] = (0.0, 0.0),
     **microlens_kwargs,
 ) -> tuple[Image, list[dict[str, float]]]:
-    """Orchestrate synthetic microlens image generation with optional substrate tilt."""
+    """Generate a microlens image with optional substrate tilt.
+
+    `slope_xy` is passed to `add_tilt`; the other keyword arguments are passed
+    to `generate_microlens_image`. The ground truth is not affected by tilt.
+
+    Returns
+    -------
+    tuple of (Image, list of dict)
+        Height map and complete-lens ground truth.
+    """
     image, ground_truth = generate_microlens_image(**microlens_kwargs)
     return add_tilt(image, slope_xy), ground_truth
 
@@ -21,19 +33,9 @@ def generate_synthetic_image(
 def add_tilt(image: Image, slope: tuple[float, float]) -> Image:
     """Return a copy of `image` with the plane ``z = a * x + b * y`` added.
 
-    Parameters
-    ----------
-    image : Image
-        Input height map; it is not modified.
-    slope : tuple of float
-        ``(a, b)``, in `image.data_unit` per `image.xy_unit` along x and y.
-        Coordinates are pixel centers (``x = column * pixel_size_x``,
-        ``y = row * pixel_size_y``), so the plane is zero at pixel (0, 0).
-
-    Returns
-    -------
-    Image
-        New image with the same pixel sizes and units.
+    `slope` is ``(a, b)`` in data unit per lateral unit (no unit conversion).
+    Pixel-center coordinates are used, so the plane is zero at pixel (0, 0).
+    The input image is not modified.
     """
     if not isinstance(slope, (tuple, list)) or len(slope) != 2:
         raise ValueError("slope must be a pair (a, b)")
@@ -62,41 +64,26 @@ def generate_microlens_image(
     footprint_radius_nm: float = 750.0,
     lens_height_nm: float = 500.0,
 ) -> tuple[Image, list[dict[str, float]]]:
-    """Generate a periodic spherical-cap microlens array seen through a FoV.
+    """Generate a periodic spherical-cap lens array on a flat substrate.
 
-    Lens centers lie on the lattice ``x_i = offset_x + i * pitch_x`` and
-    ``y_j = offset_y + j * pitch_y`` for all integers ``i, j``, in the
-    pixel-center coordinates of `Image` (``x = column * pixel_size_x``,
-    ``y = row * pixel_size_y``). Each lens is a spherical cap on a substrate
-    at ``z = 0``, with its apex at `lens_height_nm` and footprint edge at
-    ``z = 0``. Every lens with at least one pixel center strictly inside its
-    footprint is rendered, including partially visible lenses whose center is
-    outside the image. Only complete lenses are listed in the ground truth: a
-    lens is partial, and omitted, if any pixel inside its footprint lies in
-    the first or last row or column of the image.
+    Lattice, cap geometry, and the complete/partial lens rule are defined in
+    ``docs/methodology.md``. Partial lenses are rendered but not returned in
+    the ground truth.
 
     Parameters
     ----------
     image_shape : tuple of int
-        Image shape ``(n_y, n_x)``, i.e. rows then columns.
+        ``(n_y, n_x)``.
     fov_nm, lens_pitch_nm, offset_nm : tuple of float
-        Field of view, lattice pitch, and lattice position of lens
-        ``i = j = 0``, each in nm and ordered ``(x, y)``. Offsets may be
-        negative or exceed the FoV.
+        ``(x, y)`` in nm. `offset_nm` is the center of lens ``i = j = 0``.
     footprint_radius_nm, lens_height_nm : float
-        Cap footprint radius and geometric apex height in nm. The height must
-        not exceed the radius, and each pitch must be at least twice the
-        radius so lenses do not overlap.
+        Cap footprint radius and apex height in nm.
 
     Returns
     -------
-    image : Image
-        Height map in nm with pixel sizes ``fov / n``.
-    ground_truth : list of dict
-        One entry per complete (non-border-touching) lens, ordered by
-        ``index_y`` then ``index_x``, with keys ``index_x``, ``index_y``,
-        ``center_x_nm``, ``center_y_nm``, ``sphere_radius_nm``,
-        ``footprint_radius_nm`` and ``geometric_height_nm``.
+    tuple of (Image, list of dict)
+        Height map in nm, and one ground-truth dict per complete lens
+        (lattice indices, centers, sphere and footprint radii, height).
     """
     for name, pair in (
         ("image_shape", image_shape),

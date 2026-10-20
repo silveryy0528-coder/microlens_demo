@@ -78,7 +78,7 @@ def test_settings_WHEN_frozen_instance_is_reassigned_THEN_raises_frozen_instance
 
 def test_yaml_io_WHEN_dictionary_is_written_and_read_THEN_round_trips(tmp_path):
     data = {"preprocessing": {"method": "all_pixels"}, "enabled": True}
-    path = tmp_path / "settings.yaml"
+    path = tmp_path / "processing_settings.yaml"
 
     write_yaml(path, data)
 
@@ -151,7 +151,7 @@ def test_yaml_and_microlens_settings_WHEN_input_is_malformed_THEN_raises_clear_e
 def test_microlens_settings_WHEN_serialized_and_reconstructed_THEN_preserves_values(
     tmp_path,
 ):
-    config_path = Path(__file__).parents[1] / "configs" / "settings.yaml"
+    config_path = Path(__file__).parents[1] / "configs" / "processing_settings.yaml"
     settings = MicrolensSettings.from_dict(read_yaml(config_path))
     saved_path = tmp_path / "saved.yaml"
 

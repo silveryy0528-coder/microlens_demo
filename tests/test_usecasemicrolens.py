@@ -13,7 +13,7 @@ from microlens.usecasemicrolens import (
 )
 
 
-DEFAULT_SETTINGS_PATH = Path(__file__).parents[1] / "configs" / "settings.yaml"
+DEFAULT_SETTINGS_PATH = Path(__file__).parents[1] / "configs" / "processing_settings.yaml"
 
 
 def test_use_case_microlens_WHEN_initialized_THEN_references_original_with_incomplete_states():

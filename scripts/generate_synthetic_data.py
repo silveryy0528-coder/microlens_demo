@@ -1,9 +1,6 @@
 """Generate and save synthetic microlens datasets under ``data/synthetic``.
 
-All images share the same shape, FoV, pitch, and lens geometry. Image ``i`` of
-``N`` shifts the lattice offset by ``i * pitch / N`` (modulo the pitch) along
-each axis, starting from the base offset, to produce different views.
-
+All images share the same shape, FoV, pitch, and lens geometry.
 Per image ``NN`` the script writes:
 
 - ``data_file_synthetic_NN.csv``: height values only, no headers or indices.
@@ -12,8 +9,6 @@ Per image ``NN`` the script writes:
 - ``2d_image_plot_synthetic_NN.png`` and ``1d_cross_section_synthetic_NN.png``.
 """
 
-import argparse
-import inspect
 import json
 import math
 from pathlib import Path
@@ -24,36 +19,40 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 
+from microlens.settings import read_yaml
 from microlens.synthetic import generate_synthetic_image
 
-OUTPUT_DIR = Path(__file__).resolve().parents[1] / "data" / "synthetic"
-DEFAULTS = {
-    name: parameter.default
-    for name, parameter in inspect.signature(generate_synthetic_image).parameters.items()
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+CONFIG_PATH = PROJECT_ROOT / "configs" / "synthetic_generation.yaml"
+OUTPUT_DIR = PROJECT_ROOT / "data" / "synthetic"
+CONFIG_KEYS = {
+    "num_images", "image_shape", "fov_nm", "lens_pitch_nm", "base_offset_nm",
+    "footprint_radius_nm", "lens_height_nm", "overwrite",
 }
+PAIR_KEYS = ("image_shape", "fov_nm", "lens_pitch_nm", "base_offset_nm")
 
 
-def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    parser.add_argument("--num-images", type=int, default=1)
-    parser.add_argument("--image-shape", type=int, nargs=2, metavar=("N_Y", "N_X"),
-                        default=DEFAULTS["image_shape"])
-    parser.add_argument("--fov-nm", type=float, nargs=2, metavar=("X", "Y"),
-                        default=DEFAULTS["fov_nm"])
-    parser.add_argument("--lens-pitch-nm", type=float, nargs=2, metavar=("X", "Y"),
-                        default=DEFAULTS["lens_pitch_nm"])
-    parser.add_argument("--base-offset-nm", type=float, nargs=2, metavar=("X", "Y"),
-                        default=DEFAULTS["offset_nm"])
-    parser.add_argument("--footprint-radius-nm", type=float,
-                        default=DEFAULTS["footprint_radius_nm"])
-    parser.add_argument("--lens-height-nm", type=float,
-                        default=DEFAULTS["lens_height_nm"])
-    parser.add_argument("--overwrite", action="store_true",
-                        help="replace existing output files instead of failing")
-    args = parser.parse_args()
-    if args.num_images < 1:
-        parser.error("--num-images must be at least 1")
-    return args
+def load_config(path: Path) -> dict:
+    """Read the YAML config, require all keys, and convert pairs to tuples."""
+    config = read_yaml(path)
+    missing = CONFIG_KEYS - config.keys()
+    unknown = config.keys() - CONFIG_KEYS
+    if missing or unknown:
+        raise ValueError(
+            f"Invalid {path.name}: missing keys {sorted(missing)}, "
+            f"unknown keys {sorted(unknown)}."
+        )
+    num_images = config["num_images"]
+    if isinstance(num_images, bool) or not isinstance(num_images, int) or num_images < 1:
+        raise ValueError("num_images must be an integer >= 1.")
+    if not isinstance(config["overwrite"], bool):
+        raise ValueError("overwrite must be true or false.")
+    for key in PAIR_KEYS:
+        value = config[key]
+        if not isinstance(value, list) or len(value) != 2:
+            raise ValueError(f"{key} must be a list of two values.")
+        config[key] = tuple(value)
+    return config
 
 
 def phase_shifted_offset(base_offset_nm, pitch_nm, index, num_images):
@@ -107,8 +106,9 @@ def save_cross_section_plot(image, ground_truth, path):
 
 
 def main() -> None:
-    args = parse_args()
-    width = max(2, len(str(args.num_images)))
+    config = load_config(CONFIG_PATH)
+    num_images = config["num_images"]
+    width = max(2, len(str(num_images)))
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
     prefixes = [
@@ -119,26 +119,26 @@ def main() -> None:
     paths = [
         [OUTPUT_DIR / f"{prefix}_{number:0{width}d}{suffix}"
          for prefix, suffix in zip(prefixes, suffixes)]
-        for number in range(1, args.num_images + 1)
+        for number in range(1, num_images + 1)
     ]
     existing = [p for group in paths for p in group if p.exists()]
-    if existing and not args.overwrite:
+    if existing and not config["overwrite"]:
         raise SystemExit(
             f"{len(existing)} output file(s) already exist, e.g. {existing[0]}. "
-            "Use --overwrite to replace them."
+            "Set overwrite: true in the config to replace them."
         )
 
     for index, (csv_path, json_path, map_path, profile_path) in enumerate(paths):
         offset_nm = phase_shifted_offset(
-            args.base_offset_nm, args.lens_pitch_nm, index, args.num_images
+            config["base_offset_nm"], config["lens_pitch_nm"], index, num_images
         )
         image, ground_truth = generate_synthetic_image(
-            image_shape=tuple(args.image_shape),
-            fov_nm=tuple(args.fov_nm),
-            lens_pitch_nm=tuple(args.lens_pitch_nm),
+            image_shape=config["image_shape"],
+            fov_nm=config["fov_nm"],
+            lens_pitch_nm=config["lens_pitch_nm"],
             offset_nm=offset_nm,
-            footprint_radius_nm=args.footprint_radius_nm,
-            lens_height_nm=args.lens_height_nm,
+            footprint_radius_nm=config["footprint_radius_nm"],
+            lens_height_nm=config["lens_height_nm"],
         )
         if not ground_truth:
             raise SystemExit(
@@ -158,21 +158,21 @@ def main() -> None:
                 "data_unit": image.data_unit,
             },
             "generation_parameters": {
-                "image_shape_n_y_n_x": list(args.image_shape),
-                "fov_nm_x_y": list(args.fov_nm),
-                "lens_pitch_nm_x_y": list(args.lens_pitch_nm),
-                "base_offset_nm_x_y": list(args.base_offset_nm),
+                "image_shape_n_y_n_x": list(config["image_shape"]),
+                "fov_nm_x_y": list(config["fov_nm"]),
+                "lens_pitch_nm_x_y": list(config["lens_pitch_nm"]),
+                "base_offset_nm_x_y": list(config["base_offset_nm"]),
                 "offset_nm_x_y": list(offset_nm),
-                "footprint_radius_nm": args.footprint_radius_nm,
-                "lens_height_nm": args.lens_height_nm,
-                "num_images": args.num_images,
+                "footprint_radius_nm": config["footprint_radius_nm"],
+                "lens_height_nm": config["lens_height_nm"],
+                "num_images": num_images,
             },
             "cross_section_y_nm": profile_y_nm,
             "ground_truth_note": "Complete lenses only; lenses touching the image border are omitted.",
             "ground_truth": ground_truth,
         }
         json_path.write_text(json.dumps(metadata, indent=2))
-        print(f"Image {index + 1}/{args.num_images}: offset_nm={offset_nm}, "
+        print(f"Image {index + 1}/{num_images}: offset_nm={offset_nm}, "
               f"{len(ground_truth)} complete lenses -> {csv_path.parent}")
 
 

@@ -25,6 +25,8 @@ from microlens.synthetic import generate_synthetic_image
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 CONFIG_PATH = PROJECT_ROOT / "configs" / "generation_settings.yaml"
 OUTPUT_DIR = PROJECT_ROOT / "data" / "synthetic"
+RANDOM_SEED = 42
+SLOPE_RANGE = (-0.01, 0.01)  # uniform bounds of each of the x and y slopes, nm/nm
 CONFIG_KEYS = {
     "num_images", "image_shape", "fov_nm", "lens_pitch_nm", "base_offset_nm",
     "footprint_radius_nm", "lens_height_nm", "overwrite",
@@ -128,11 +130,15 @@ def main() -> None:
             "Set overwrite: true in the config to replace them."
         )
 
+    rng = np.random.default_rng(RANDOM_SEED)
+
     for index, (csv_path, json_path, map_path, profile_path) in enumerate(paths):
         offset_nm = phase_shifted_offset(
             config["base_offset_nm"], config["lens_pitch_nm"], index, num_images
         )
+        slope_xy = tuple(float(s) for s in rng.uniform(*SLOPE_RANGE, size=2))
         image, ground_truth = generate_synthetic_image(
+            slope_xy=slope_xy,
             image_shape=config["image_shape"],
             fov_nm=config["fov_nm"],
             lens_pitch_nm=config["lens_pitch_nm"],
@@ -163,6 +169,7 @@ def main() -> None:
                 "lens_pitch_nm_x_y": list(config["lens_pitch_nm"]),
                 "base_offset_nm_x_y": list(config["base_offset_nm"]),
                 "offset_nm_x_y": list(offset_nm),
+                "slope_xy": list(slope_xy),
                 "footprint_radius_nm": config["footprint_radius_nm"],
                 "lens_height_nm": config["lens_height_nm"],
                 "num_images": num_images,

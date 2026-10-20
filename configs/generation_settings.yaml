@@ -5,4 +5,4 @@ lens_pitch_nm: [2000, 2000]  # [x, y]
 base_offset_nm: [1000, 1000] # [x, y]
 footprint_radius_nm: 750
 lens_height_nm: 500
-overwrite: false
+overwrite: true

@@ -2,7 +2,7 @@ import numpy as np
 import pytest
 
 from microlens.image import Image
-from microlens.synthetic import generate_synthetic_image
+from microlens.synthetic import add_tilt, generate_synthetic_image
 
 
 def single_lens_kwargs(**overrides):
@@ -248,3 +248,29 @@ def test_generate_synthetic_image_WHEN_configuration_is_invalid_THEN_raises_expe
 ):
     with pytest.raises(error):
         generate_synthetic_image(**{parameter: value})
+
+
+def test_add_tilt_WHEN_pixel_sizes_differ_THEN_adds_analytical_plane_and_keeps_metadata():
+    image = Image(np.ones((3, 4)), 2.0, 5.0, "nm", "nm")
+
+    tilted = add_tilt(image, (0.1, -0.02))
+
+    x = np.arange(4) * 2.0
+    y = np.arange(3) * 5.0
+    expected = 1.0 + 0.1 * x[np.newaxis, :] - 0.02 * y[:, np.newaxis]
+    np.testing.assert_allclose(tilted.values, expected)
+    assert (tilted.pixel_size_x, tilted.pixel_size_y) == (2.0, 5.0)
+    assert (tilted.xy_unit, tilted.data_unit) == ("nm", "nm")
+
+
+def test_add_tilt_WHEN_slope_is_zero_or_nonzero_THEN_original_image_is_unchanged():
+    image, _ = generate_synthetic_image(**single_lens_kwargs())
+    original = image.values.copy()
+
+    untilted = add_tilt(image, (0.0, 0.0))
+    tilted = add_tilt(image, (0.01, 0.02))
+
+    np.testing.assert_array_equal(untilted.values, original)
+    np.testing.assert_array_equal(image.values, original)
+    assert tilted.values is not image.values
+    assert not np.array_equal(tilted.values, original)

@@ -1,6 +1,7 @@
 """Generate analytical synthetic microlens height maps."""
 
 import math
+import copy
 from numbers import Integral, Real
 
 import numpy as np
@@ -9,6 +10,51 @@ from microlens.image import Image
 
 
 def generate_synthetic_image(
+    slope_xy: tuple[float, float] = (0.0, 0.0),
+    **microlens_kwargs,
+) -> tuple[Image, list[dict[str, float]]]:
+    """Orchestrate synthetic microlens image generation with optional substrate tilt."""
+    image, ground_truth = generate_microlens_image(**microlens_kwargs)
+    return add_tilt(image, slope_xy), ground_truth
+
+
+def add_tilt(image: Image, slope: tuple[float, float]) -> Image:
+    """Return a copy of `image` with the plane ``z = a * x + b * y`` added.
+
+    Parameters
+    ----------
+    image : Image
+        Input height map; it is not modified.
+    slope : tuple of float
+        ``(a, b)``, in `image.data_unit` per `image.xy_unit` along x and y.
+        Coordinates are pixel centers (``x = column * pixel_size_x``,
+        ``y = row * pixel_size_y``), so the plane is zero at pixel (0, 0).
+
+    Returns
+    -------
+    Image
+        New image with the same pixel sizes and units.
+    """
+    if not isinstance(slope, (tuple, list)) or len(slope) != 2:
+        raise ValueError("slope must be a pair (a, b)")
+    for value in slope:
+        if isinstance(value, bool) or not isinstance(value, Real):
+            raise TypeError("slope entries must be real numbers")
+        if not math.isfinite(value):
+            raise ValueError("slope entries must be finite")
+
+    slope_x, slope_y = slope
+    n_y, n_x = image.values.shape
+    x_coordinates = np.arange(n_x) * image.pixel_size_x
+    y_coordinates = np.arange(n_y) * image.pixel_size_y
+    plane = slope_x * x_coordinates[np.newaxis, :] + slope_y * y_coordinates[:, np.newaxis]
+
+    image_out = copy.deepcopy(image)
+    image_out.values += plane
+    return image_out
+
+
+def generate_microlens_image(
     image_shape: tuple[int, int] = (1024, 1024),
     fov_nm: tuple[float, float] = (6000.0, 6000.0),
     lens_pitch_nm: tuple[float, float] = (2000.0, 2000.0),

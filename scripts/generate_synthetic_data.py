@@ -23,7 +23,7 @@ from microlens.settings import read_yaml
 from microlens.synthetic import generate_synthetic_image
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-CONFIG_PATH = PROJECT_ROOT / "configs" / "synthetic_generation.yaml"
+CONFIG_PATH = PROJECT_ROOT / "configs" / "generation_settings.yaml"
 OUTPUT_DIR = PROJECT_ROOT / "data" / "synthetic"
 CONFIG_KEYS = {
     "num_images", "image_shape", "fov_nm", "lens_pitch_nm", "base_offset_nm",

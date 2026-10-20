@@ -1,4 +1,4 @@
-num_images: 1
+num_images: 3
 image_shape: [1024, 1024]    # [n_y, n_x]
 fov_nm: [6000, 6000]         # [x, y]
 lens_pitch_nm: [2000, 2000]  # [x, y]
